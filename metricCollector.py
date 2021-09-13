@@ -1,13 +1,16 @@
 import argparse
+from numpy import index_exp
 import pandas
 import os
 
-from pandas._config import config
 
-def combine():
-    pass
-
-def starLogs(config, outdir, metricLibrary):
+def finalCombine(metricLibrary, outdir, fileout):
+    import functools
+    
+    finalDf = functools.reduce(lambda df1,df2: pandas.merge(df1,df2,on='sampleName'), metricLibrary)
+    finalDf.to_csv(os.path.join(outdir, fileout), sep ='\t', index = False)
+    
+def starLogs(config, metricLibrary):
     
     starMetrics = {}
     toProcess = [[name, loc] for name,loc in zip(config['sampleName'],config['starLogs'])]
@@ -27,13 +30,11 @@ def starLogs(config, outdir, metricLibrary):
     combinedMetrics['sampleName'] = combinedMetrics.index
     
     metricLibrary.append(combinedMetrics)
-
-    #combinedMetrics.to_csv(os.path.join(outdir, filename), sep = '\t', index = False)
     
     return metricLibrary
 
 
-def picardRNA(config, outdir, metricLibrary):
+def picardRNA(config, metricLibrary):
     
     picardRNAmetrics = {}
     toProcess = [[name, loc] for name,loc in zip(config['sampleName'], config['picardRNA'])]
@@ -53,13 +54,14 @@ def picardRNA(config, outdir, metricLibrary):
     
     return metricLibrary
                                         
-def picardAlignment(config, outdir, metricLibrary):
+def picardAlignment(config, metricLibrary):
     pass
 
-def picardInsertSize(config, outdir, metricLibrary):
+def picardInsertSize(config, metricLibrary):
     picardInsertSizemetrics = {}
     toProcess = [[name, loc] for name,loc in zip(config['sampleName'], config['picardInsertSize'])]
     for logs in toProcess:
+        print(logs)
         with open(logs[1], 'r') as metrics:
             for line in metrics:
                 if line.startswith('MEDIAN_INSERT_SIZE'): # look for header
@@ -72,10 +74,9 @@ def picardInsertSize(config, outdir, metricLibrary):
     combinedMetrics['sampleName'] = combinedMetrics.index
     
     metricLibrary.append(combinedMetrics)
-    
     return metricLibrary
 
-def picardMarkDups(config, outdir, metricLibrary):
+def picardMarkDups(config, metricLibrary):
     
     picardDupsMetrics = {}
     toProcess = [[name, loc] for name,loc in zip(config['sampleName'], config['picardMarkDups'])]
@@ -110,21 +111,25 @@ if __name__ == '__main__':
     '''
     TODO
     check that directory path exists
-    check config header with proper names exist
+    check config header with proper names existoutdir, 
     check metrics listed are valid options
     '''
-        
-    if args.metrics == 'starLogs':
-        listOfDfs = starLogs(config = configDf, outdir = args.outdir, filename = args.filename, metricLibrary = listOfDfs)
     
-    if args.metrics == 'picardRNA':
-        listOfDfs = picardRNA(config = configDf, outdir = args.outdir, metricLibrary = listOfDfs)
+    logFilesToProcess = [allLogs.strip() for allLogs in args.metrics.split(',')]
+        
+    if 'starLogs' in logFilesToProcess:
+        listOfDfs = starLogs(config = configDf, metricLibrary = listOfDfs)
     
-    if args.metrics == 'picardInsertSize':
-        listOfDfs = picardInsertSize(config = configDf, outdir = args.outdir, metricLibrary = listOfDfs)
+    if 'picardRNA' in logFilesToProcess:
+        listOfDfs = picardRNA(config = configDf, metricLibrary = listOfDfs)
+    
+    if 'picardInsertSize' in logFilesToProcess:
+        listOfDfs = picardInsertSize(config = configDf, metricLibrary = listOfDfs)
         
-    if args.metrics == 'picardMarkDups':
-        listOfDfs = picardMarkDups(config = configDf, outdir = args.outdir, metricLibrary = listOfDfs)
+    if 'picardMarkDups' in logFilesToProcess:
+        listOfDfs = picardMarkDups(config = configDf, metricLibrary = listOfDfs)
         
-    if args.metrics == 'picardAlignment':
-        listOfDfs = picardAlignment(config = configDf, outdir = args.outdir, metricLibrary= listOfDfs)
+    if 'picardAlignment' in logFilesToProcess:
+        listOfDfs = picardAlignment(config = configDf, metricLibrary= listOfDfs)
+        
+    finalCombine(metricLibrary = listOfDfs, outdir = args.outdir, fileout = args.filename) 
