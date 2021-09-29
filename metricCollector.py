@@ -1,5 +1,4 @@
 import argparse
-from numpy import index_exp
 import pandas
 import os
 
@@ -93,14 +92,60 @@ def picardMarkDups(config, metricLibrary):
     combinedMetrics['sampleName'] = combinedMetrics.index
     
     metricLibrary.append(combinedMetrics)
-    
     return metricLibrary
+
+
+def tophatLogs(config, metricLibrary):
+    
+    tophatMetrics = {}
+    keyNames = []
+    values = []
+    toProcess = [[name, loc] for name,loc in zip(config['sampleName'], config['tophatLogs'])]
+    for logs in toProcess:
+        with open(logs[1], 'r') as metrics:
+            for line in metrics:
+                if line.strip().endswith('overall read mapping rate.'): # look for header
+                    keyNames.append('tophat_overall_read_mapping_rate')
+                    values.append(line.split()[0])
+                if line.strip().endswith('concordant pair alignment rate.'):
+                    keyNames.append('tophat_concordant_pair_alignment_rate')
+                    values.append(line.split()[0])
+            tophatMetrics[logs[0]] = dict(zip(keyNames, values)) # pair key value lists into dictionary and store as dict of dicts
+        
+    combinedMetrics = pandas.DataFrame.from_dict(tophatMetrics, orient = 'index')
+    combinedMetrics['sampleName'] = combinedMetrics.index
+    
+    metricLibrary.append(combinedMetrics)
+
+    return metricLibrary
+
+
+def hisatLogs(config, metricLibrary):
+    
+    hisatMetrics = {}
+    toProcess = [[name, loc] for name,loc in zip(config['sampleName'], config['hisatLogs'])]
+    for logs in toProcess:
+        with open(logs[1], 'r') as metrics:
+            for line in metrics:
+                if line.strip().endswith('overall alignment rate'): # look for header
+                    hisatMetrics[logs[0]] = dict(hisat_overall_alignment_rate=line.split()[0]) # pair key value lists into dictionary and store as dict of dicts
+                    break
+        
+    combinedMetrics = pandas.DataFrame.from_dict(hisatMetrics, orient = 'index')
+    combinedMetrics['sampleName'] = combinedMetrics.index
+    
+    metricLibrary.append(combinedMetrics)
+    return metricLibrary
+
+
+def flagstat(config, metricLibrary):
+    pass
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('A piece of code to concatenate different metrics into a large metrics file for downstream analysis.')
     parser.add_argument('--config', required=True, help='A tab-delimited files containing the location of all metric files for each sample.')
-    parser.add_argument('--metrics', help='Comma-separated list of all metrics to combine.  Options include: starLogs, picardRNA, picardAlignment, pircardInsertSize, picardMarkDups')
+    parser.add_argument('--metrics', help='Comma-separated list of all metrics to combine.  Options include: starLogs, tophatLogs, hisatLogs, picardRNA, picardAlignment, pircardInsertSize, picardMarkDups, flagstat')
     parser.add_argument('--outdir', default=os.getcwd(), help='Path to output directory (must already exist)')
     parser.add_argument('--filename', default='metricCollector.out', help='Name of output file')
     args = parser.parse_args()
@@ -131,5 +176,15 @@ if __name__ == '__main__':
         
     if 'picardAlignment' in logFilesToProcess:
         listOfDfs = picardAlignment(config = configDf, metricLibrary= listOfDfs)
+    
+    if 'tophatLogs' in logFilesToProcess:
+        listOfDfs = tophatLogs(config = configDf, metricLibrary= listOfDfs)
+
+    if 'hisatLogs' in logFilesToProcess:
+        listOfDfs = hisatLogs(config = configDf, metricLibrary= listOfDfs)
+    
+    if 'flagstat' in logFilesToProcess:
+        listOfDfs = hisatLogs(config = configDf, metricLibrary= listOfDfs)
+
         
     finalCombine(metricLibrary = listOfDfs, outdir = args.outdir, fileout = args.filename) 
